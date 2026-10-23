@@ -5,5 +5,5 @@ spotify:
 library: library
 collections:
   - liked
-tui: true
 dry_run: false
+

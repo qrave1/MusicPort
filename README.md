@@ -1,47 +1,56 @@
 # MusicPort
 
-Go-приложение для авторизации Spotify и импорта коллекции «Мне нравится» и доступных плейлистов.
+Desktop-приложение на Go и Fyne для Spotify-коллекции.
 
 ## Запуск
 
-Скопируйте `config.example.yaml` в `config.yaml` и заполните `spotify.client_id`. Настройки загружает отдельный пакет `internal/config`.
+Скопируйте config.example.yaml в config.yaml, укажите spotify.client_id и зарегистрируйте Redirect URI http://127.0.0.1:8888/callback в Spotify Developer Dashboard.
 
 ```powershell
 Copy-Item config.example.yaml config.yaml
-go run . -login
+./scripts/run.ps1
+```
+
+Окно содержит кнопки входа в Spotify, обновления плейлистов и загрузки треков, выбор коллекции, поиск и отмену запроса. По умолчанию выбрана коллекция «Мне нравится». Вход открывается в системном браузере, токены остаются в keyring. Если вход уже выполнен, нажмите «Загрузить треки».
+
+Источник аудио пока не подключён: GUI показывает реальные метаданные Spotify, но не скачивает полные аудиофайлы.
+
+## Сборка Windows
+
+Fyne требует CGO и GCC (MinGW-w64). Скрипт использует portable GCC из .tools/mingw64/bin, если он есть; иначе gcc должен быть в PATH. Скрипт меняет переменные только на время своего выполнения.
+
+```powershell
+./scripts/build.ps1
+```
+
+Либо при установленном GCC:
+
+```powershell
+$env:CGO_ENABLED = '1'
 go run .
+go build -ldflags '-H=windowsgui' -o musicport.exe .
 ```
 
-В примере включён TUI и выбрана коллекция `liked`. Другой файл можно указать через `-config settings.yaml`. Приоритет: явно заданные флаги → `SPOTIFY_CLIENT_ID` → YAML → значения по умолчанию. Для отключения TUI используйте `-tui=false`.
+## Конфигурация и CLI
 
-Без стандартного config.yaml запуск с флагами допустим; явно указанный файл должен существовать. Неизвестные поля и неверные настройки вызывают ошибку. Путь library отсчитывается от рабочей папки. Токены сохраняются только в keyring. При наличии config.yaml запуск без аргументов использует его настройки.
-
-Создайте приложение в Spotify Developer Dashboard, зарегистрируйте Redirect URI `http://127.0.0.1:8888/callback` и укажите Client ID:
+-config указывает YAML-файл. Приоритет: явно заданные флаги → SPOTIFY_CLIENT_ID → YAML → defaults. Старый YAML-параметр tui принимается для совместимости и игнорируется. GUI запускается по умолчанию. CLI доступен явно:
 
 ```powershell
-$env:SPOTIFY_CLIENT_ID = 'your-client-id'
 go run . -login
-go run . -collections liked -tui
-```
-
-Откройте ссылку из команды login в браузере и разрешите доступ. Токены сохраняются в системном keyring. В TUI Enter запускает обработку коллекции, q отменяет работу или закрывает интерфейс после завершения.
-
-```powershell
 go run . -list
-go run . -collections liked,PLAYLIST_ID -dry-run
+go run . -headless -collections liked -dry-run
 ```
 
-По умолчанию используется «Мне нравится». Запуск без аргументов и без config.yaml показывает справку. Полные аудиофайлы Spotify API не предоставляет; адаптер внешнего аудиоисточника пока не подключён. Импортированные треки отображаются со статусом unresolved. Ручные файлы со ссылками не требуются.
+## Тесты
 
-## Проверки
+GUI тестируется программным драйвером Fyne без рабочего стола. Моки Service генерируются minimock.
 
 ```powershell
+$env:GOFLAGS = '-tags=ci'
 go generate ./...
-go test ./...
-go test -tags=integration ./...
+go test -tags 'ci,integration' ./...
 go vet ./...
 go build .
 ```
 
-Реализованы SQLite-индекс, проверка SHA-256, блокировка второго процесса и восстановление опубликованных файлов в ядре загрузчика. Тесты minimock и интеграционные тесты работают без обращения к Spotify. Реальный OAuth требует вашего приложения Spotify.
-
+Тег ci отключает desktop-драйвер, поэтому такой бинарник проверяет сборку, но не открывает окно. Для desktop используйте scripts/build.ps1 без этого тега. Unit-тесты не обращаются к реальному Spotify и keyring. Реальный OAuth проверяется вручную.

@@ -6,6 +6,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      GOFLAGS: -tags=ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -16,9 +18,21 @@ jobs:
         run: |
           git diff --exit-code
           test -z "$(git ls-files --others --exclude-standard -- '*_mock_test.go')"
-      - run: go test -count=1 -tags=integration ./...
-      - run: go vet ./...
+      - run: go test -count=1 -tags=ci,integration ./...
+      - run: go vet -tags ci ./...
       - run: go mod verify
-      - run: go build .
+      - run: go build -tags ci .
       - if: runner.os == 'Linux'
-        run: go test -race -tags=integration ./...
+        run: go test -race -tags=ci,integration ./...
+  desktop-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
+      - run: go build .
+        env:
+          CGO_ENABLED: '1'
+

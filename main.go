@@ -1,17 +1,16 @@
 package main
 
 import (
-	tea "charm.land/bubbletea/v2"
 	"context"
 
 	"flag"
 	"fmt"
 	"github.com/qrave1/MusicPort/internal/app"
 	"github.com/qrave1/MusicPort/internal/config"
+	"github.com/qrave1/MusicPort/internal/gui"
 	"github.com/qrave1/MusicPort/internal/spotify"
 	"github.com/qrave1/MusicPort/internal/store"
 	"github.com/qrave1/MusicPort/internal/syncer"
-	"github.com/qrave1/MusicPort/internal/tui"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,7 +29,7 @@ func run() error {
 
 	root := flag.String("library", "library", "destination directory")
 	dry := flag.Bool("dry-run", false, "show pending downloads")
-	ui := flag.Bool("tui", false, "interactive progress and retry")
+	headless := flag.Bool("headless", false, "run CLI instead of desktop GUI")
 	login := flag.Bool("login", false, "authorize Spotify")
 	list := flag.Bool("list", false, "list Spotify collections")
 	collections := flag.String("collections", "liked", "comma-separated playlist IDs or liked")
@@ -43,11 +42,7 @@ func run() error {
 	if loadErr != nil && (!os.IsNotExist(loadErr) || explicit["config"]) {
 		return loadErr
 	}
-	if flag.NFlag() == 0 && os.IsNotExist(loadErr) {
-		fmt.Println("MusicPort: start with -login, then -collections liked -tui.")
-		flag.PrintDefaults()
-		return nil
-	}
+
 	if env := os.Getenv("SPOTIFY_CLIENT_ID"); env != "" {
 		settings.Spotify.ClientID = env
 	}
@@ -63,11 +58,12 @@ func run() error {
 	if explicit["collections"] {
 		settings.Collections = strings.Split(*collections, ",")
 	}
-	if explicit["tui"] {
-		settings.TUI = *ui
-	}
+
 	if explicit["dry-run"] {
 		settings.DryRun = *dry
+	}
+	if !*headless && !*login && !*list {
+		return gui.Run(settings)
 	}
 	if err := settings.Validate(); err != nil {
 		return err
@@ -76,7 +72,7 @@ func run() error {
 	*redirect = settings.Spotify.RedirectURI
 	*root = settings.Library
 	*collections = strings.Join(settings.Collections, ",")
-	*ui = settings.TUI
+
 	*dry = settings.DryRun
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -125,9 +121,6 @@ func run() error {
 	}
 	defer index.DB.Close()
 	runner := app.Runner{Tracks: tracks, Store: index, HTTP: &http.Client{Timeout: 5 * time.Minute}, Dry: *dry}
-	if *ui {
-		_, err = tea.NewProgram(tui.New(runner), tea.WithContext(ctx)).Run()
-		return err
-	}
+
 	return runner.Run(ctx, func(s string) { fmt.Println(s) })
 }

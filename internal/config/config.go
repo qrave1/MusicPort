@@ -20,6 +20,7 @@ type Config struct {
 	Spotify     Spotify  `yaml:"spotify"`
 	Library     string   `yaml:"library"`
 	Collections []string `yaml:"collections"`
+	// TUI is accepted for compatibility with pre-GUI configuration files and ignored.
 	TUI         bool     `yaml:"tui"`
 	DryRun      bool     `yaml:"dry_run"`
 }
