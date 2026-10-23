@@ -1,0 +1,4 @@
+musicport.exe
+library/
+coverage*.out
+config.yaml
